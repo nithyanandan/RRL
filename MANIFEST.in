@@ -1,0 +1,4 @@
+include *.txt rrl/examples/*.yaml rrl/examples/*.txt
+recursive-include docs examples data scripts
+recursive-include *.txt *.py *.yaml *.fits *.csv *.hmap
+prune examples/sample?/build
