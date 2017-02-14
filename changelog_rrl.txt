@@ -1,0 +1,11 @@
+From 34d2d85 (master):
+=====================
+
+(*) Add rrl/rrlines.py to repository
+
+In rrl/rrlines.py,
+
+(*) Add functions restframe_freq_recomb(), redshifted_freq_recomb(),
+check_recomb_transitions_in_freq_range(),
+search_transitions_in_freq_range() but are currently without
+docstrings
