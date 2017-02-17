@@ -3,6 +3,43 @@ from astropy import constants as FCNST
 
 def restframe_freq_recomb(atomic_number, atomic_mass, n, dn=1, screening=False):
 
+    """
+    ---------------------------------------------------------------------------
+    Determine rest frame frequencies of photons emitted from electronic
+    transitions for an atom of specific atomic and mass numbers, and the
+    principal quantum number levels of electronic transitions
+
+    Inputs:
+
+    atomic_number   [integer] Atomic number of the atom. It is equal to the
+                    number of protons in the nucleus. Must be positive and
+                    greater than or equal to unity.
+
+    atomic_mass     [integer] Atomic mass of the atom. It is equal to the sum
+                    of the number of protons and neutrons in the nucleus. Must 
+                    be positive and greater than or equal to unity.
+
+    n               [scalar or numpy array] Principal quantum number of 
+                    electron orbits. Must be positive and greater than or 
+                    equal to unity.
+
+    dn              [scalar or numpy array] Difference in principal quantum
+                    number making the transition from n+dn --> n. It must be
+                    positive and greater than or equal to unity (default). It 
+                    must be of the same size as input n
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    Output:
+
+    The rest frame frequency (Hz) for the specified electronic transitions. It
+    is of the same size as inputs n and dn
+    ---------------------------------------------------------------------------
+    """
+
     try:
         atomic_number, atomic_mass, n
     except NameError:
@@ -48,7 +85,51 @@ def restframe_freq_recomb(atomic_number, atomic_mass, n, dn=1, screening=False):
 
     return nu
 
-def redshifted_freq_recomb(atomic_number, atomic_mass, n, dn=1, z=0.0, screening=False):
+###############################################################################
+    
+def redshifted_freq_recomb(atomic_number, atomic_mass, n, dn=1, z=0.0,
+                           screening=False):
+
+    """
+    ---------------------------------------------------------------------------
+    Determine redshifted frequencies of photons emitted from electronic
+    transitions for an atom of specific atomic and mass numbers, and the
+    principal quantum number levels of electronic transitions
+
+    Inputs:
+
+    atomic_number   [integer] Atomic number of the atom. It is equal to the
+                    number of protons in the nucleus. Must be positive and
+                    greater than or equal to unity.
+
+    atomic_mass     [integer] Atomic mass of the atom. It is equal to the sum
+                    of the number of protons and neutrons in the nucleus. Must 
+                    be positive and greater than or equal to unity.
+
+    n               [scalar or numpy array] Principal quantum number of 
+                    electron orbits. Must be positive and greater than or equal 
+                    to unity unity.
+
+    dn              [scalar or numpy array] Difference in principal quantum
+                    number making the transition from n+dn --> n. It must be
+                    positive and greater than or equal to unity. It must be of 
+                    the same size as input n.
+
+    z               [scalar or numpy array] The redshift (when positive) or 
+                    blueshift (when negative) by which the recombination lines
+                    are shifted. Default=0
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    Output:
+
+    The rest frame frequency (Hz) for the specified electronic transitions. It
+    is of the shape size(n) x size(z)
+    ---------------------------------------------------------------------------
+    """
 
     nu = restframe_freq_recomb(atomic_number, atomic_mass, n, dn=dn, screening=screening)
     if not isinstance(z, (int, float, NP.ndarray)):
@@ -58,7 +139,51 @@ def redshifted_freq_recomb(atomic_number, atomic_mass, n, dn=1, z=0.0, screening
         nu = nu.reshape(-1,1) / (1.0 + z)
         return nu
 
-def check_recomb_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n, dn, z=None, screening=False):
+###############################################################################
+
+def check_recomb_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n, dn, z=0.0, screening=False):
+
+    """
+    ---------------------------------------------------------------------------
+    Check if the recomination lines from specified electronic transitions are
+    in a given frequency range
+
+    Inputs:
+
+    freq_min        [scalar] Minimum in the frequency range (Hz)
+
+    freq_max        [scalar] Maximum in the frequency range (Hz)
+
+    atomic_number   [integer] Atomic number of the atom. It is equal to the
+                    number of protons in the nucleus. Must be positive and
+                    greater than or equal to unity.
+
+    atomic_mass     [integer] Atomic mass of the atom. It is equal to the sum
+                    of the number of protons and neutrons in the nucleus. Must 
+                    be positive and greater than or equal to unity.
+
+    n               [scalar] Principal quantum number of lower electron orbit. 
+                    Must be positive and greater than or equal to unity unity.
+
+    dn              [scalar] Difference in principal quantum number making the 
+                    transition from n+dn --> n. It must be positive and greater 
+                    than or equal to unity. 
+
+    z               [scalar or numpy array] The redshift (when positive) or 
+                    blueshift (when negative) by which the recombination lines
+                    are shifted. Default=0
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    Output:
+
+    -1 if the recombination line is below the frequency range, 0 if it is in 
+    the frequency range and +1 if it is above the frequency range
+    ---------------------------------------------------------------------------
+    """
 
     try:
         freq_min, freq_max, atomic_number, atomic_mass, n, dn
@@ -99,7 +224,89 @@ def check_recomb_transitions_in_freq_range(freq_min, freq_max, atomic_number, at
     else:
         return 0
     
-def search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n_min=1, n_max=1000, dn_min=1, dn_max=10, z=0.0, screening=False, extendsearch=None):
+###############################################################################
+
+def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
+                                     atomic_mass, n_min=1, n_max=1000,
+                                     dn_min=1, dn_max=10, z=0.0,
+                                     screening=False, extendsearch=None):
+
+    """
+    ---------------------------------------------------------------------------
+    Search for electronic transitions of recombination lines at a specified 
+    redshift that lie within the specified frequency range
+
+    Inputs:
+
+    freq_min        [scalar] Minimum in the frequency range (Hz)
+
+    freq_max        [scalar] Maximum in the frequency range (Hz)
+
+    atomic_number   [integer] Atomic number of the atom. It is equal to the
+                    number of protons in the nucleus. Must be positive and
+                    greater than or equal to unity.
+
+    atomic_mass     [integer] Atomic mass of the atom. It is equal to the sum
+                    of the number of protons and neutrons in the nucleus. Must 
+                    be positive and greater than or equal to unity.
+
+    n_min           [scalar] Minimum in the range of principal quantum numbers 
+                    of lower electron orbit to search for transitions.
+                    Must be positive and greater than or equal to unity unity.
+
+    n_max           [scalar] Maximum in the range of principal quantum numbers 
+                    of lower electron orbit to search for transitions.
+                    Must be positive and greater than or equal to unity unity.
+
+    dn_min          [scalar] Minimum in the range of difference in principal 
+                    quantum numbers search for transitions. Must be positive 
+                    and greater than or equal to unity unity.
+
+    dn_max          [scalar] Maximum in the range of difference in principal 
+                    quantum numbers search for transitions. Must be positive 
+                    and greater than or equal to unity unity.
+
+    z               [scalar or numpy array] The redshift (when positive) or 
+                    blueshift (when negative) by which the recombination lines
+                    are shifted. Default=0
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    extendsearch    [None or dictionary] Specifies if the search should be 
+                    extended beyond the ranges for n and dn by calling this 
+                    function recursively. If set to None (default), the search 
+                    will not be extended. Otherwise, search will extend along n
+                    and/or dn if in-range frequencies are found at the 
+                    specified boundaries of n and dn. This parameter must be
+                    specified as a dictionary with the following keys and
+                    values:
+                    'n'     [None or list] If set to None, do not extend search
+                            for more values of n. Otherwise it must be a list
+                            containing one or both of the strings 'up' and
+                            'down'. If 'up' is present, extend search for 
+                            higher values of n from the previous iteration. If
+                            'down' is present in the list, extend search for
+                            values of n lower than specified in the range in 
+                            previous iteration.
+                    'dn'    [None or list] If set to None, do not extend search
+                            for more values of dn. Otherwise it must be a list
+                            containing one or both of the strings 'up' and
+                            'down'. If 'up' is present, extend search for 
+                            higher values of dn from the previous iteration. If
+                            'down' is present in the list, extend search for
+                            values of dn lower than specified in the range in 
+                            previous iteration.
+
+    Output:
+
+    Tuple of (n, dn, freq) where each of the elements in the tuple is an array
+    such that the transitions of combinations of n and dn produces 
+    recombination lines for a given redshift in the specified frequency range
+    ---------------------------------------------------------------------------
+    """
 
     try:
         freq_min, freq_max, atomic_number, atomic_mass
@@ -254,4 +461,5 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_m
                             
     return (n_in_range, dn_in_range, nu_in_range)
     
+###############################################################################
     

@@ -1,3 +1,12 @@
+From 6030e3a (master):
+=====================
+
+In rrl/rrlines.py,
+
+(*) Add docstring to functions restframe_freq_recomb(),
+redshifted_freq_recomb(), check_recomb_transitions_in_freq_range()
+and search_transitions_in_freq_range()
+
 From 34d2d85 (master):
 =====================
 
