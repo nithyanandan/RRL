@@ -43,7 +43,7 @@ def restframe_freq_recomb(atomic_number, atomic_mass, n, dn=1, screening=False):
     try:
         atomic_number, atomic_mass, n
     except NameError:
-        raise NameError('Inputs atmoic number, atomic mass and lower electron level must be specified')
+        raise NameError('Inputs atomic_number, atomic_mass and lower electron level, n, must be specified')
 
     if not isinstance(atomic_number, int):
         raise TypeError('Input atomic_number must be an integer')
@@ -62,12 +62,14 @@ def restframe_freq_recomb(atomic_number, atomic_mass, n, dn=1, screening=False):
         raise ValueError('Lower electron level must be greater than 1')
 
     if not isinstance(dn, (int, NP.ndarray)):
-        raise TypeError('Input dn must be an integer or numpy array')
+        if not NP.isinf(dn):
+            raise TypeError('Input dn must be an integer or numpy array')
     dn = NP.asarray(dn).reshape(-1)
     if NP.any(dn < 1):
         raise ValueError('Lower electron level must be greater than 1')
     if dn.size != n.size:
-        raise ValueError('Sizes of inputs n and dn must be same')
+        if dn.size != 1:
+            raise ValueError('Sizes of inputs n and dn must be same, else dn must be a scalar')
 
     if not isinstance(screening, bool):
         raise TypeError('Input screening must be a boolean')

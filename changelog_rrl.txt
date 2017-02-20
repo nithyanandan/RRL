@@ -1,3 +1,26 @@
+From 6b87fe4 (master):
+=====================
+
+(*) Add rrl/rrphysics.py to git repository
+
+(*) Add some atomic data under rrl/data/ to git repository
+
+In rrl/rrphysics.py,
+
+(*) Add functions bohr_radius(), statistical_weight(),
+oscillator_strength(), classical_Einstein_A_coeff(),
+einstein_A_coeff(), einstein_B_ul_coeff(), einstein_B_lu_coeff(),
+doppler_broadened_rrline_profile(), saha_boltzmann_equation(),
+and number_density_with_energy_level() along with docstrings
+
+In rrl/rrlines.py,
+
+(*) Minor changes
+
+In setup.py,
+
+(*) Include package data files now added in rrl/data/
+
 From 6030e3a (master):
 =====================
 
