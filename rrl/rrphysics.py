@@ -398,7 +398,7 @@ def einstein_B_ul_coeff(atomic_number, n, dn=1, atomic_mass=None, screening=Fals
     else:
         nu = RRL.restframe_freq_recomb(atomic_number, atomic_mass, n, dn=dn, screening=screening)
         a_ul = einstein_A_coeff(atomic_number, atomic_mass, n, dn, screening=screening)
-        b_ul = (FCNST.c)**3 / (8 * NP.pi * FCNST.h * nu**3)
+        b_ul = (FCNST.c)**3 / (8 * NP.pi * FCNST.h * nu**3) * a_ul
 
     return b_ul
 
@@ -473,7 +473,7 @@ def einstein_B_lu_coeff(atomic_number, n, dn=1, atomic_mass=None, screening=Fals
     else:
         nu = RRL.restframe_freq_recomb(atomic_number, atomic_mass, n, dn=dn, screening=screening)
         a_ul = einstein_A_coeff(atomic_number, atomic_mass, n, dn, screening=screening)
-        b_ul = (FCNST.c)**3 / (8 * NP.pi * FCNST.h * nu**3)
+        b_ul = (FCNST.c)**3 / (8 * NP.pi * FCNST.h * nu**3) * a_ul
     g_lower = statistical_weight(atomic_number, n)
     g_upper = statistical_weight(atomic_number, n+dn)
     b_lu = (g_upper / g_lower) * b_ul
@@ -749,4 +749,5 @@ def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
     return saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, screening=screening)
 
 ###############################################################################
+
 

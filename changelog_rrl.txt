@@ -1,3 +1,11 @@
+From 848dd3b (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Fix bugs in computing Einstein B-coefficients in functions
+einstein_B_lu_coeff() and einstein_B_ul_coeff()
+
 From 3cdef78 (master):
 =====================
 
