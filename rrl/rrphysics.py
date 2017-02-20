@@ -750,4 +750,280 @@ def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
 
 ###############################################################################
 
+def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, N_l=None, N_u=None, nu_0=None, lte=True, rms_turbulent_velocity=0.0, screening=False):
 
+    """
+    ---------------------------------------------------------------------------
+    Estimate line absorption coefficient (also known as line opacity 
+    coefficient) under Local Thermodynamic Equilibrium (LTE) or otherwise. 
+    Note: I use a slightly different convention than the standard one. My 
+    definition differs from that in Radiative Processes by Rybicki & Lightman 
+    by a factor c / (4 * pi).
+
+    Inputs:
+
+    atomic_number   [scalar or numpy array] Atomic number of the atom. It is 
+                    equal to the number of protons in the nucleus. Must be 
+                    positive and greater than or equal to unity. It can be 
+                    specified as a scalar or a numpy array with size equal to 
+                    that of input n
+
+    atomic_mass     [scalar or numpy array] Atomic mass of the atom. It is 
+                    equal to the sum of the number of protons and neutrons 
+                    in the nucleus. Must be positive and greater than or equal 
+                    to unity. It can be specified as a scalar or a numpy array 
+                    with size equal to that of input n
+
+    n               [scalar or numpy array] Principal quantum number of 
+                    electron orbits. Must be positive and greater than or equal 
+                    to unity unity.
+
+    dn              [scalar or numpy array] Difference in principal quantum
+                    number making the transition from n+dn --> n. It must be
+                    positive and greater than or equal to unity (default). It 
+                    must be a scalar or of the same size as input n
+
+    nu              [scalar or numpy array] Frequency (Hz) at which line 
+                    profile is to be estimated. If specified as numpy array, 
+                    it must be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity
+
+    T_e             [scalar or numpy array] Electron temperature (in K). Must be 
+                    positive. It can be specified as a scalar or a numpy array 
+                    with size equal to that of input n
+
+    N_e             [scalar or numpy array] Number density (in cm^-3) of 
+                    electrons. Must be positive. It can be specified as a 
+                    scalar or a numpy array with size equal to that of input n
+
+    N_ion           [scalar or numpy array] Number density (in cm^-3) of 
+                    ions. Must be positive. It can be specified as a 
+                    scalar or a numpy array with size equal to that of input n.
+                    If set to None (default), it will be assumed to be equal 
+                    to N_e
+
+    N_l             [scalar or numpy array] Number density (in cm^-3) of
+                    particles with electrons occupying the energy level n. It
+                    can be a scalar or numpy array with size equal to that of
+                    input n. If input lte is set to False, this must be provided
+                    in order to estimate under non-equilibrium conditions. If
+                    input lte is set to True, this value is ignored and 
+                    computed from the Saha-Boltzmann equation which is valid
+                    under LTE. 
+
+    N_u             [scalar or numpy array] Number density (in cm^-3) of
+                    particles with electrons occupying the energy level n+dn. 
+                    It can be a scalar or numpy array with size equal to that 
+                    of input n. If input lte is set to False, this must be 
+                    provided in order to estimate under non-equilibrium 
+                    conditions. If input lte is set to True, this value is 
+                    ignored and computed inherently from the Saha-Boltzmann 
+                    equation which is valid under LTE. 
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Should be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity.
+                    If set to None, it will be assumed to be equal to the 
+                    input nu in which case the line-center opacity coefficients
+                    are estimated. 
+
+    rms_turbulent_velocity
+                    [scalar or numpy array] RMS of turbulent velocity (in 
+                    km/s). If specified as numpy array, it must be of same 
+                    size as input nu. Could also be specified as an instance 
+                    of class astropy.units.Quantity Quantity. Default=0.
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    Output:
+
+    Line opacity coefficients (also known as line absorption coefficients) in 
+    units of 1/m estimated for the specified energy levels, frequencies and
+    physical conditions under LTE or otherwise. It is of same size as inputs
+    nu and/or n
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        atomic_number, atomic_mass
+    except NameError:
+        raise NameError('Inputs atomic_number and atomic_mass must be specified')
+
+    if not isinstance(atomic_number, int):
+        raise TypeError('Input atomic_number must be an integer')
+    if atomic_number < 1:
+        raise ValueError('Input atomic_number must be greater than 1')
+
+    if not isinstance(atomic_mass, int):
+        raise TypeError('Input atomic_mass must be an integer')
+    if atomic_mass < atomic_number:
+        raise ValueError('Inout atomic_mass must be greater than or equal to atomic number')
+
+    if not isinstance(n, (int, NP.ndarray)):
+        raise TypeError('Input n must be an integer or numpy array')
+    n = NP.asarray(n).reshape(-1)
+    if NP.any(n < 1):
+        raise ValueError('Lower electron level must be greater than 1')
+
+    if not isinstance(dn, (int, NP.ndarray)):
+        if not NP.isinf(dn):
+            raise TypeError('Input dn must be an integer or numpy array')
+    dn = NP.asarray(dn).reshape(-1)
+    if NP.any(dn < 1):
+        raise ValueError('Lower electron level must be greater than 1')
+    if dn.size != n.size:
+        if dn.size != 1:
+            raise ValueError('Sizes of inputs n and dn must be same, else dn must be a scalar')
+
+    if nu_0 is None:
+        nu_0 = nu
+
+    if not isinstance(lte, bool):
+        raise TypeError('Input lte must be boolean')
+
+    a_ul = einstein_A_coeff(atomic_number, atomic_mass, n, dn=dn, screening=screening)
+    g_u = statistical_weight(atomic_number, n+dn)
+    g_l = statistical_weight(atomic_number, n)
+
+    if not lte:
+        if (N_l is None) or (N_u is None):
+            raise ValueError('When LTE is not valid, both inputs N_l and N_u must be specified')
+
+        if not isinstance(N_l, (int,float,NP.ndarray,units.Quantity)):
+            raise TypeError('Input N_l must be a scalar or numpy array')
+        if not isinstance(N_l, units.Quantity):
+            N_l = NP.asarray(N_l).reshape(-1) * units.cm**-3
+        else:
+            N_l = units.Quantity(NP.asarray(N_l.value).reshape(-1), N_l.unit)
+        if NP.any(N_l < 0.0 * units.cm**-3):
+            raise ValueError('Input N_l must not be negative')
+
+        if not isinstance(N_u, (int,float,NP.ndarray,units.Quantity)):
+            raise TypeError('Input N_u must be a scalar or numpy array')
+        if not isinstance(N_u, units.Quantity):
+            N_u = NP.asarray(N_u).reshape(-1) * units.cm**-3
+        else:
+            N_u = units.Quantity(NP.asarray(N_u.value).reshape(-1), N_u.unit)
+        if NP.any(N_u < 0.0 * units.cm**-3):
+            raise ValueError('Input N_u must not be negative')
+
+        expr_in_parenthesis = 1.0 - (g_l*N_u)/(g_u*N_l)
+    else:
+        N_l = number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, screening=screening)
+        expr_in_parenthesis = 1.0 - NP.exp(-1.0 * FCNST.h * nu / FCNST.k_B / T_e)
+
+    n_protons = atomic_number
+    n_neutrons = atomic_mass - atomic_number
+    m_nucleus = n_protons * FCNST.m_p + n_neutrons * FCNST.m_n
+    line_profile = doppler_broadened_rrline_profile(m_nucleus, T_e, nu_0, nu, rms_turbulent_velocity=rms_turbulent_velocity)
+
+    absorption_coeff = FCNST.c**2 / (8.0 * NP.pi * nu**2) * N_l * (g_u/g_l) * a_ul * expr_in_parenthesis * line_profile
+
+    return absorption_coeff.decompose()
+
+###############################################################################
+
+def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, N_l=None, N_u=None, nu_0=None, lte=True, rms_turbulent_velocity=0.0, screening=False):
+
+    """
+    ---------------------------------------------------------------------------
+    An alias for the function line_absoprtion_coefficient()
+    Estimate line opacity coefficient (also known as line absorption 
+    coefficient) under Local Thermodynamic Equilibrium (LTE) or otherwise. 
+    Note: I use a slightly different convention than the standard one. My 
+    definition differs from that in Radiative Processes by Rybicki & Lightman 
+    by a factor c / (4 * pi).
+
+    Inputs:
+
+    atomic_number   [scalar or numpy array] Atomic number of the atom. It is 
+                    equal to the number of protons in the nucleus. Must be 
+                    positive and greater than or equal to unity. It can be 
+                    specified as a scalar or a numpy array with size equal to 
+                    that of input n
+
+    atomic_mass     [scalar or numpy array] Atomic mass of the atom. It is 
+                    equal to the sum of the number of protons and neutrons 
+                    in the nucleus. Must be positive and greater than or equal 
+                    to unity. It can be specified as a scalar or a numpy array 
+                    with size equal to that of input n
+
+    n               [scalar or numpy array] Principal quantum number of 
+                    electron orbits. Must be positive and greater than or equal 
+                    to unity unity.
+
+    dn              [scalar or numpy array] Difference in principal quantum
+                    number making the transition from n+dn --> n. It must be
+                    positive and greater than or equal to unity (default). It 
+                    must be a scalar or of the same size as input n
+
+    nu              [scalar or numpy array] Frequency (Hz) at which line 
+                    profile is to be estimated. If specified as numpy array, 
+                    it must be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity
+
+    T_e             [scalar or numpy array] Electron temperature (in K). Must be 
+                    positive. It can be specified as a scalar or a numpy array 
+                    with size equal to that of input n
+
+    N_e             [scalar or numpy array] Number density (in cm^-3) of 
+                    electrons. Must be positive. It can be specified as a 
+                    scalar or a numpy array with size equal to that of input n
+
+    N_ion           [scalar or numpy array] Number density (in cm^-3) of 
+                    ions. Must be positive. It can be specified as a 
+                    scalar or a numpy array with size equal to that of input n.
+                    If set to None (default), it will be assumed to be equal 
+                    to N_e
+
+    N_l             [scalar or numpy array] Number density (in cm^-3) of
+                    particles with electrons occupying the energy level n. It
+                    can be a scalar or numpy array with size equal to that of
+                    input n. If input lte is set to False, this must be provided
+                    in order to estimate under non-equilibrium conditions. If
+                    input lte is set to True, this value is ignored and 
+                    computed from the Saha-Boltzmann equation which is valid
+                    under LTE. 
+
+    N_u             [scalar or numpy array] Number density (in cm^-3) of
+                    particles with electrons occupying the energy level n+dn. 
+                    It can be a scalar or numpy array with size equal to that 
+                    of input n. If input lte is set to False, this must be 
+                    provided in order to estimate under non-equilibrium 
+                    conditions. If input lte is set to True, this value is 
+                    ignored and computed inherently from the Saha-Boltzmann 
+                    equation which is valid under LTE. 
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Should be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity.
+                    If set to None, it will be assumed to be equal to the 
+                    input nu in which case the line-center opacity coefficients
+                    are estimated. 
+
+    rms_turbulent_velocity
+                    [scalar or numpy array] RMS of turbulent velocity (in 
+                    km/s). If specified as numpy array, it must be of same 
+                    size as input nu. Could also be specified as an instance 
+                    of class astropy.units.Quantity Quantity. Default=0.
+
+    screening       [boolean] If set to False (default), assume the effective
+                    charge is equal to the number of protons. If set to True,
+                    assume the charges from the nucleus are screened and the
+                    effecctive nuclear charge is equal to unity.
+
+    Output:
+
+    Line opacity coefficients (also known as line absorption coefficients) in 
+    units of 1/m estimated for the specified energy levels, frequencies and
+    physical conditions under LTE or otherwise. It is of same size as inputs
+    nu and/or n
+    ---------------------------------------------------------------------------
+    """
+
+    return line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=N_ion, N_l=N_l, N_u=N_u, nu_0=nu_0, lte=lte, rms_turbulent_velocity=rms_turbulent_velocity, screening=screening)
+
+###############################################################################

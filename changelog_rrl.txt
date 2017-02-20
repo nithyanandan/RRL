@@ -1,3 +1,12 @@
+From dbe576c (master):
+=====================
+
+In rrl/rrlphysics.py,
+
+(*) Add functions line_absorption_coefficient() and
+line_opacity_coefficient() along with docstring to esimate line
+absorption coefficient (also known as line opacity coefficient)
+
 From 848dd3b (master):
 =====================
 
