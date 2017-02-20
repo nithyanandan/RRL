@@ -1,5 +1,6 @@
 import numpy as NP
 from astropy import constants as FCNST
+from astropy import units
 
 def restframe_freq_recomb(atomic_number, atomic_mass, n, dn=1, screening=False):
 
@@ -192,15 +193,19 @@ def check_recomb_transitions_in_freq_range(freq_min, freq_max, atomic_number, at
     except NameError:
         raise NameError('Inputs freq_min, freq_max, atomic_number, atomic_mass, n, dn must be specified')
 
-    if not isinstance(freq_min, (int,float)):
+    if not isinstance(freq_min, (int,float,units.Quantity)):
         raise TypeError('Input freq_min must be a scalar')
-    if freq_min <= 0.0:
+    if not isinstance(freq_min, units.Quantity):
+        freq_min = freq_min * units.Hertz
+    if freq_min <= 0.0 * units.Hertz:
         raise ValueError('Input freq_min must be positive')
 
-    if not isinstance(freq_max, (int,float)):
+    if not isinstance(freq_max, (int,float,units.Quantity)):
         raise TypeError('Input freq_max must be a scalar')
-    if freq_max <= 0.0:
-        raise ValueError('Input freq_max must be positive')
+    if not isinstance(freq_max, units.Quantity):
+        freq_max = freq_max * units.Hertz
+    if freq_max <= freq_min:
+        raise ValueError('Input freq_max must be greater than freq_min')
 
     if not isinstance(n, int):
         raise TypeError('Input n must be a scalar')
@@ -306,7 +311,8 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
 
     Tuple of (n, dn, freq) where each of the elements in the tuple is an array
     such that the transitions of combinations of n and dn produces 
-    recombination lines for a given redshift in the specified frequency range
+    recombination lines for a given redshift in the specified frequency range.
+    freq will be returned as an instance of class astropy.units.Quantity
     ---------------------------------------------------------------------------
     """
 
@@ -342,6 +348,20 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
         else:
             raise TypeError('Input z must be a scalar')
             
+    if not isinstance(freq_min, (int,float,units.Quantity)):
+        raise TypeError('Input freq_min must be a scalar')
+    if not isinstance(freq_min, units.Quantity):
+        freq_min = freq_min * units.Hertz
+    if freq_min <= 0.0 * units.Hertz:
+        raise ValueError('Input freq_min must be positive')
+
+    if not isinstance(freq_max, (int,float,units.Quantity)):
+        raise TypeError('Input freq_max must be a scalar')
+    if not isinstance(freq_max, units.Quantity):
+        freq_max = freq_max * units.Hertz
+    if freq_max <= freq_min:
+        raise ValueError('Input freq_max must be greater than freq_min')
+
     if extendsearch is not None:
         if not isinstance(extendsearch, dict):
             raise TypeError('Input extendsearch must be a dictionary')
@@ -355,7 +375,7 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
     ngrid, dngrid = NP.meshgrid(nvect, dnvect, indexing='ij')
     nu = redshifted_freq_recomb(atomic_number, atomic_mass, ngrid.reshape(-1), dngrid.reshape(-1), z=z, screening=screening)
     nu = nu.reshape(nvect.size, dnvect.size, -1)
-    ind_select = NP.where(NP.logical_and(nu.value >= freq_min, nu.value <= freq_max))
+    ind_select = NP.where(NP.logical_and(nu >= freq_min, nu <= freq_max))
     nu_select = nu[ind_select]
     n_select = ngrid[:,:,NP.newaxis][ind_select]
     dn_select = dngrid[:,:,NP.newaxis][ind_select]
@@ -364,11 +384,11 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
     dn_in_range = None
     if nu_select.size > 0:
         if nu_in_range is not None:
-            nu_in_range = NP.concatenate((nu_in_range, nu_select))
+            nu_in_range = units.Quantity(NP.concatenate((nu_in_range.value, nu_select.value)), nu_select.unit)
             n_in_range = NP.concatenate((n_in_range, n_select))
             dn_in_range = NP.concatenate((dn_in_range, dn_select))
         else:
-            nu_in_range = NP.copy(nu_select)
+            nu_in_range = nu_select.copy()
             n_in_range = NP.copy(n_select)
             dn_in_range = NP.copy(dn_select)
 
@@ -390,11 +410,11 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
                                 new_n_select, new_dn_select, new_nu_select = search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n_min=new_n_min, n_max=new_n_max, dn_min=dn_min, dn_max=dn_max, z=z, screening=screening, extendsearch=new_extendsearch)
                                 if new_nu_select.size > 0:
                                     if nu_in_range is not None:
-                                        nu_in_range = NP.concatenate((nu_in_range, new_nu_select))
+                                        nu_in_range = units.Quantity(NP.concatenate((nu_in_range.value, new_nu_select.value)), new_nu_select.unit)
                                         n_in_range = NP.concatenate((n_in_range, new_n_select))
                                         dn_in_range = NP.concatenate((dn_in_range, new_dn_select))
                                     else:
-                                        nu_in_range = NP.copy(new_nu_select)
+                                        nu_in_range = new_nu_select.copy()
                                         n_in_range = NP.copy(new_n_select)
                                         dn_in_range = NP.copy(new_dn_select)
                         if n_select.min() == n_min:
@@ -411,11 +431,11 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
                                     new_n_select, new_dn_select, new_nu_select = search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n_min=new_n_min, n_max=new_n_max, dn_min=dn_min, dn_max=dn_max, z=z, screening=screening, extendsearch=new_extendsearch)
                                     if new_nu_select.size > 0:
                                         if nu_in_range is not None:
-                                            nu_in_range = NP.concatenate((new_nu_select, nu_in_range))
+                                            nu_in_range = units.Quantity(NP.concatenate((new_nu_select.value, nu_in_range.value)), new_nu_select.unit)
                                             n_in_range = NP.concatenate((new_n_select, n_in_range))
                                             dn_in_range = NP.concatenate((new_dn_select, dn_in_range))
                                         else:
-                                            nu_in_range = NP.copy(new_nu_select)
+                                            nu_in_range = new_nu_select.copy()
                                             n_in_range = NP.copy(new_n_select)
                                             dn_in_range = NP.copy(new_dn_select)
                     if key == 'dn':
@@ -432,11 +452,11 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
                                 new_n_select, new_dn_select, new_nu_select = search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n_min=n_min, n_max=n_max, dn_min=new_dn_min, dn_max=new_dn_max, z=z, screening=screening, extendsearch=new_extendsearch)
                                 if new_nu_select.size > 0:
                                     if nu_in_range is not None:
-                                        nu_in_range = NP.concatenate((nu_in_range, new_nu_select))
+                                        nu_in_range = units.Quantity(NP.concatenate((nu_in_range.value, new_nu_select.value)), new_nu_select.unit)
                                         n_in_range = NP.concatenate((n_in_range, new_n_select))
                                         dn_in_range = NP.concatenate((dn_in_range, new_dn_select))
                                     else:
-                                        nu_in_range = NP.copy(new_nu_select)
+                                        nu_in_range = new_nu_select.copy()
                                         n_in_range = NP.copy(new_n_select)
                                         dn_in_range = NP.copy(new_dn_select)
                         if dn_select.min() == dn_min:
@@ -453,11 +473,11 @@ def search_transitions_in_freq_range(freq_min, freq_max, atomic_number,
                                     new_n_select, new_dn_select, new_nu_select = search_transitions_in_freq_range(freq_min, freq_max, atomic_number, atomic_mass, n_min=n_min, n_max=n_max, dn_min=new_dn_min, dn_max=new_dn_max, z=z, screening=screening, extendsearch=new_extendsearch)
                                     if new_nu_select.size > 0:
                                         if nu_in_range is not None:
-                                            nu_in_range = NP.concatenate((new_nu_select, nu_in_range))
+                                            nu_in_range = units.Quantity(NP.concatenate((new_nu_select.value, nu_in_range.value)), new_nu_select.unit)
                                             n_in_range = NP.concatenate((new_n_select, n_in_range))
                                             dn_in_range = NP.concatenate((new_dn_select, dn_in_range))
                                         else:
-                                            nu_in_range = NP.copy(new_nu_select)
+                                            nu_in_range = new_nu_select.copy()
                                             n_in_range = NP.copy(new_n_select)
                                             dn_in_range = NP.copy(new_dn_select)
                             

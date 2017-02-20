@@ -1,3 +1,13 @@
+From 3cdef78 (master):
+=====================
+
+In rrl/rrlines.py,
+
+(*) Import astropy.units
+(*) Update function search_transitions_in_freq_range() to return
+frequencies in range as an instance of class astropy.units.Quantity.
+Update docstring accordingly
+
 From 6b87fe4 (master):
 =====================
 
