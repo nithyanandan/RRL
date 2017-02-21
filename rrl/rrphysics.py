@@ -773,7 +773,7 @@ def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
 
 ###############################################################################
 
-def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, N_l=None, N_u=None, nu_0=None, lte=True, rms_turbulent_velocity=0.0, screening=False):
+def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, nu_0=None, rms_turbulent_velocity=0.0, lte=True, non_lte_parms=None, screening=False):
 
     """
     ---------------------------------------------------------------------------
@@ -825,24 +825,6 @@ def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e,
                     If set to None (default), it will be assumed to be equal 
                     to N_e
 
-    N_l             [scalar or numpy array] Number density (in cm^-3) of
-                    particles with electrons occupying the energy level n. It
-                    can be a scalar or numpy array with size equal to that of
-                    input n. If input lte is set to False, this must be provided
-                    in order to estimate under non-equilibrium conditions. If
-                    input lte is set to True, this value is ignored and 
-                    computed from the Saha-Boltzmann equation which is valid
-                    under LTE. 
-
-    N_u             [scalar or numpy array] Number density (in cm^-3) of
-                    particles with electrons occupying the energy level n+dn. 
-                    It can be a scalar or numpy array with size equal to that 
-                    of input n. If input lte is set to False, this must be 
-                    provided in order to estimate under non-equilibrium 
-                    conditions. If input lte is set to True, this value is 
-                    ignored and computed inherently from the Saha-Boltzmann 
-                    equation which is valid under LTE. 
-
     nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
                     Should be of same size as input nu. Could also be 
                     specified as an instance of class astropy.units.Quantity.
@@ -855,6 +837,53 @@ def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e,
                     km/s). If specified as numpy array, it must be of same 
                     size as input nu. Could also be specified as an instance 
                     of class astropy.units.Quantity Quantity. Default=0.
+
+    lte             [boolean] Indicate if local thermodynamic equilibrium 
+                    is valid (True, by default) or not (False). If set to 
+                    False, information specified in non_lte_parms will be used
+                    in determining populations at energy levels and hence
+                    the opacity coefficient
+
+    non_lte_parms   [dictionary] Dictionary containing information about
+                    departure coefficients or number densities in case 
+                    LTE is not valid. If set to None (default), LTE will be
+                    assumed to be True. Otherwise, it mut contain one of the 
+                    following keys and corresponding information. If both 
+                    these keys are set to None, LTE will be assumed to be True.
+                    'numdensity'    [dictionary] If set to None, value under
+                                    key 'departure_coeff' will be used. 
+                                    Otherwise, it must contain both the 
+                                    following keys and values:
+                                    'lower'     [scalar or numpy array] It
+                                                contains the number density
+                                                of particles with electrons 
+                                                in the energy level n in units
+                                                of cm^-3. It has to be positive
+                                                and can be a scalar or numpy 
+                                                array of same size as n
+                                    'upper'     [scalar or numpy array] It
+                                                contains the number density
+                                                of particles with electrons 
+                                                in the energy level n+dn in 
+                                                units of cm^-3. It has to be 
+                                                positive and can be a scalar 
+                                                or numpy array of same size 
+                                                as n
+                    'departure_coeff'    
+                                    [dictionary] If set, it must contain both 
+                                    the following keys and values:
+                                    'lower'     [scalar or numpy array] It
+                                                contains the departure 
+                                                b(n) in the energy level n. It 
+                                                must lie in the range [0,1]. It
+                                                has to be a scalar or numpy 
+                                                array of same size as n
+                                    'upper'     [scalar or numpy array] It
+                                                contains the departure b(n+dn) 
+                                                in the energy level n+dn. It 
+                                                must lie in the range [0,1]. It 
+                                                has to be a scalar or numpy 
+                                                array of same size as n
 
     screening       [boolean] If set to False (default), assume the effective
                     charge is equal to the number of protons. If set to True,
@@ -912,30 +941,81 @@ def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e,
     g_l = statistical_weight(atomic_number, n)
 
     if not lte:
-        if (N_l is None) or (N_u is None):
-            raise ValueError('When LTE is not valid, both inputs N_l and N_u must be specified')
-
-        if not isinstance(N_l, (int,float,NP.ndarray,units.Quantity)):
-            raise TypeError('Input N_l must be a scalar or numpy array')
-        if not isinstance(N_l, units.Quantity):
-            N_l = NP.asarray(N_l).reshape(-1) * units.cm**-3
+        use_numdensity = True
+        use_departures = False
+        if non_lte_parms is None:
+            warnings.warn('No parameters provided to describe non-LTE conditions. Proceeding by assuming LTE...')
+            lte = True
+            use_numdensity = False
+        elif not isinstance(non_lte_parms, dict):
+            raise TypeError('Input non_lte_parms must be a dictionary')
         else:
-            N_l = units.Quantity(NP.asarray(N_l.value).reshape(-1), N_l.unit)
-        if NP.any(N_l < 0.0 * units.cm**-3):
-            raise ValueError('Input N_l must not be negative')
+            if 'numdensity' in non_lte_parms:
+                if non_lte_parms['numdensity'] is None:
+                    use_departures = True
+                    use_numdensity = False
+                elif not isinstance(non_lte_parms['numdensity'], dict):
+                    raise TypeError('Number density parameter in non_lte_parms must be a dictionary')
+                elif ('upper' not in non_lte_parms['numdensity']) or ('lower' not in non_lte_parms['numdensity']):
+                    raise TypeError('Number density parameters in non_lte_parms must be a dictionary and contain keys "upper" and "lower"')
+                else:
+                    N_u = non_lte_parms['numdensity']['upper']
+                    N_l = non_lte_parms['numdensity']['lower']
+                    if not isinstance(N_u, (int,float,NP.ndarray,units.Quantity)):
+                        raise TypeError('Number density must be a scalar or numpy array')
+                    if not isinstance(N_u, units.Quantity):
+                        N_u = NP.asarray(N_u).reshape(-1) / units.cm**3
+                    else:
+                        N_u = units.Quantity(NP.asarray(N_u.value).reshape(-1), N_u.unit)
+                    if NP.any(N_u <= 0.0/units.cm**3):
+                        raise ValueError('Input N_u must be positive')
 
-        if not isinstance(N_u, (int,float,NP.ndarray,units.Quantity)):
-            raise TypeError('Input N_u must be a scalar or numpy array')
-        if not isinstance(N_u, units.Quantity):
-            N_u = NP.asarray(N_u).reshape(-1) * units.cm**-3
+                    if not isinstance(N_l, units.Quantity):
+                        N_l = NP.asarray(N_l).reshape(-1) / units.cm**3
+                    else:
+                        N_l = units.Quantity(NP.asarray(N_l.value).reshape(-1), N_l.unit)
+                    if NP.any(N_l <= 0.0/units.cm**3):
+                        raise ValueError('Input N_l must be positive')
+                    
+        if use_numdensity:
+            expr_in_parenthesis = 1.0 - (g_l*N_u)/(g_u*N_l)
+        elif use_departures:
+            if non_lte_parms['departure_coeff'] is None:
+                warnings.warn('No parameters provided to describe non-LTE conditions. Proceeding by assuming LTE...')
+                lte = True
+                use_departures = False
+            elif not isinstance(non_lte_parms['departure_coeff'], dict):
+                raise TypeError('Departure parameters in non_lte_parms must be a dictionary')
+            elif ('upper' not in non_lte_parms['departure_coeff']) or ('lower' not in non_lte_parms['departure_coeff']):
+                raise TypeError('Departure parameters in non_lte_parms must be a dictionary and contain keys "upper" and "lower"')
+            else:
+                b_u = non_lte_parms['departure_coeff']['upper']
+                b_l = non_lte_parms['departure_coeff']['lower']
+                if not isinstance(b_u, (int,float,NP.ndarray)):
+                    raise TypeError('Departure coefficients must be a scalar or numpy array')
+                b_u = NP.asarray(b_u).reshape(-1)
+                if b_u.size != n.size:
+                    if b_u.size != 1:
+                        raise ValueError('Departure coefficients must be a scalar or a numpy array of size n')
+                if NP.any(NP.logical_or(b_u < 0.0, b_u > 1.0)):
+                    raise ValueError('Departure coefficients must lie in the range [0,1]')
+
+                if not isinstance(b_l, (int,float,NP.ndarray)):
+                    raise TypeError('Departure coefficients must be a scalar or numpy array')
+                b_l = NP.asarray(b_l).reshape(-1)
+                if b_l.size != n.size:
+                    if b_l.size != 1:
+                        raise ValueError('Departure coefficients must be a scalar or a numpy array of size n')
+                if NP.any(NP.logical_or(b_l < 0.0, b_l > 1.0)):
+                    raise ValueError('Departure coefficients must lie in the range [0,1]')
+
+                N_l = number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, departure_coeff=b_l, screening=screening)
+                expr_in_parenthesis = 1.0 - (b_u/b_l)* NP.exp(-1.0 * FCNST.h * nu / FCNST.k_B / T_e)
         else:
-            N_u = units.Quantity(NP.asarray(N_u.value).reshape(-1), N_u.unit)
-        if NP.any(N_u < 0.0 * units.cm**-3):
-            raise ValueError('Input N_u must not be negative')
-
-        expr_in_parenthesis = 1.0 - (g_l*N_u)/(g_u*N_l)
-    else:
-        N_l = number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, screening=screening)
+            warnings.warn('Valid parameters not provided to describe non-LTE conditions. Proceeding by assuming LTE...')
+            lte = True
+    if lte:
+        N_l = number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, departure_coeff=1.0, screening=screening)
         expr_in_parenthesis = 1.0 - NP.exp(-1.0 * FCNST.h * nu / FCNST.k_B / T_e)
 
     n_protons = atomic_number
@@ -949,7 +1029,7 @@ def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e,
 
 ###############################################################################
 
-def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, N_l=None, N_u=None, nu_0=None, lte=True, rms_turbulent_velocity=0.0, screening=False):
+def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=None, nu_0=None, rms_turbulent_velocity=0.0, lte=True, non_lte_parms=None, screening=False):
 
     """
     ---------------------------------------------------------------------------
@@ -1002,24 +1082,6 @@ def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_
                     If set to None (default), it will be assumed to be equal 
                     to N_e
 
-    N_l             [scalar or numpy array] Number density (in cm^-3) of
-                    particles with electrons occupying the energy level n. It
-                    can be a scalar or numpy array with size equal to that of
-                    input n. If input lte is set to False, this must be provided
-                    in order to estimate under non-equilibrium conditions. If
-                    input lte is set to True, this value is ignored and 
-                    computed from the Saha-Boltzmann equation which is valid
-                    under LTE. 
-
-    N_u             [scalar or numpy array] Number density (in cm^-3) of
-                    particles with electrons occupying the energy level n+dn. 
-                    It can be a scalar or numpy array with size equal to that 
-                    of input n. If input lte is set to False, this must be 
-                    provided in order to estimate under non-equilibrium 
-                    conditions. If input lte is set to True, this value is 
-                    ignored and computed inherently from the Saha-Boltzmann 
-                    equation which is valid under LTE. 
-
     nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
                     Should be of same size as input nu. Could also be 
                     specified as an instance of class astropy.units.Quantity.
@@ -1032,6 +1094,53 @@ def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_
                     km/s). If specified as numpy array, it must be of same 
                     size as input nu. Could also be specified as an instance 
                     of class astropy.units.Quantity Quantity. Default=0.
+
+    lte             [boolean] Indicate if local thermodynamic equilibrium 
+                    is valid (True, by default) or not (False). If set to 
+                    False, information specified in non_lte_parms will be used
+                    in determining populations at energy levels and hence
+                    the opacity coefficient
+
+    non_lte_parms   [dictionary] Dictionary containing information about
+                    departure coefficients or number densities in case 
+                    LTE is not valid. If set to None (default), LTE will be
+                    assumed to be True. Otherwise, it mut contain one of the 
+                    following keys and corresponding information. If both 
+                    these keys are set to None, LTE will be assumed to be True.
+                    'numdensity'    [dictionary] If set to None, value under
+                                    key 'departure_coeff' will be used. 
+                                    Otherwise, it must contain both the 
+                                    following keys and values:
+                                    'lower'     [scalar or numpy array] It
+                                                contains the number density
+                                                of particles with electrons 
+                                                in the energy level n in units
+                                                of cm^-3. It has to be positive
+                                                and can be a scalar or numpy 
+                                                array of same size as n
+                                    'upper'     [scalar or numpy array] It
+                                                contains the number density
+                                                of particles with electrons 
+                                                in the energy level n+dn in 
+                                                units of cm^-3. It has to be 
+                                                positive and can be a scalar 
+                                                or numpy array of same size 
+                                                as n
+                    'departure_coeff'    
+                                    [dictionary] If set, it must contain both 
+                                    the following keys and values:
+                                    'lower'     [scalar or numpy array] It
+                                                contains the departure 
+                                                b(n) in the energy level n. It 
+                                                must lie in the range [0,1]. It
+                                                has to be a scalar or numpy 
+                                                array of same size as n
+                                    'upper'     [scalar or numpy array] It
+                                                contains the departure b(n+dn) 
+                                                in the energy level n+dn. It 
+                                                must lie in the range [0,1]. It 
+                                                has to be a scalar or numpy 
+                                                array of same size as n
 
     screening       [boolean] If set to False (default), assume the effective
                     charge is equal to the number of protons. If set to True,
@@ -1047,6 +1156,6 @@ def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_
     ---------------------------------------------------------------------------
     """
 
-    return line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=N_ion, N_l=N_l, N_u=N_u, nu_0=nu_0, lte=lte, rms_turbulent_velocity=rms_turbulent_velocity, screening=screening)
+    return line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=N_ion, nu_0=nu_0, rms_turbulent_velocity=rms_turbulent_velocity, lte=lte, non_lte_parms=non_lte_parms, screening=screening)
 
 ###############################################################################

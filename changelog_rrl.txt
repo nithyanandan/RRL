@@ -1,3 +1,12 @@
+From 0c71e30 (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Update functions line_absorption_coefficient() and
+line_opacity_coefficient() to use input non_lte_parms to handle
+non-LTE conditions. Update docstring accordingly
+
 From 11af818 (master):
 =====================
 
