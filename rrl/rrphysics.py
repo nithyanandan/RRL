@@ -482,6 +482,107 @@ def einstein_B_lu_coeff(atomic_number, n, dn=1, atomic_mass=None, screening=Fals
 
 ###############################################################################
 
+def doppler_broadened_FWHM(mass_particle, temperature, nu_0,
+                           rms_turbulent_velocity=0.0):
+
+    """
+    ---------------------------------------------------------------------------
+    Estimate Doppler broadened FWHM of recombination line profiles
+    # Reference: Rybicki & Lightman (Section 10.6)
+
+    Inputs:
+
+    mass_particle   [scalar or numpy array] Mass of particle (kg). If specified
+                    as numpy array, it must be of same size as input nu. 
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity 
+
+    temperature     [scalar or numpy array] Temperature (K). If specified
+                    as numpy array, it must be of same size as input nu.
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity 
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Should be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity 
+
+    rms_turbulent_velocity
+                    [scalar or numpy array] RMS of turbulent velocity (in 
+                    km/s). If specified as numpy array, it must be of same 
+                    size as input nu. Could also be specified as an instance 
+                    of class astropy.units.Quantity Quantity
+
+    Output:
+
+    FWHM of the Doppler broadened line profile (in Hz). Same size as input 
+    nu_0. It will be returned as an instance of class astropy.units.Quantity. 
+    It will have units of 'second'
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        mass_particle, temperature, nu_0
+    except NameError:
+        raise NameError('Inputs mass_particle, temperature, and nu_0 must be specified')
+
+    if not isinstance(mass_particle, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input mass_particle must be a scalar or a numpy array')
+    if not isinstance(mass_particle, units.Quantity):
+        mass_particle = NP.asarray(mass_particle).reshape(-1) * units.kilogram
+    else:
+        mass_particle = units.Quantity(NP.asarray(mass_particle.value).reshape(-1), mass_particle.unit)
+    if NP.any(mass_particle <= 0.0*units.kilogram):
+        raise ValueError('Input mass_particle must be positive')
+
+    if not isinstance(temperature, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input temperature must be a scalar or a numpy array')
+    if not isinstance(temperature, units.Quantity):
+        temperature = NP.asarray(temperature).reshape(-1) * units.Kelvin
+    else:
+        temperature = units.Quantity(NP.asarray(temperature.value).reshape(-1), temperature.unit)
+    if NP.any(temperature <= 0.0*units.Kelvin):
+        raise ValueError('Input temperature must be positive')
+
+    if not isinstance(nu_0, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input nu_0 must be a scalar or a numpy array')
+    if not isinstance(nu_0, units.Quantity):
+        nu_0 = NP.asarray(nu_0).reshape(-1) * units.Hertz
+    else:
+        nu_0 = units.Quantity(NP.asarray(nu_0.value).reshape(-1), nu_0.unit)
+    if NP.any(nu_0 <= 0.0*units.Hertz):
+        raise ValueError('Input nu_0 must be positive')
+    
+    if not isinstance(rms_turbulent_velocity, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input rms_turbulent_velocity must be a scalar or a numpy array')
+    if not isinstance(rms_turbulent_velocity, units.Quantity):
+        rms_turbulent_velocity = NP.asarray(rms_turbulent_velocity).reshape(-1) * units.kilometer / units.second
+    else:
+        rms_turbulent_velocity = units.Quantity(NP.asarray(rms_turbulent_velocity.value).reshape(-1), rms_turbulent_velocity.unit)
+    if NP.any(rms_turbulent_velocity < 0.0 * units.kilometer / units.second):
+        raise ValueError('Input rms_turbulent_velocity must not be negative')
+    
+    if mass_particle.size != nu_0.size:
+        if mass_particle.size != 1:
+            raise ValueError('Input mass_particle must contain one or same number of elements as input nu')
+
+    if temperature.size != nu_0.size:
+        if temperature.size != 1:
+            raise ValueError('Input temperature must contain one or same number of elements as input nu')
+
+    if nu_0.size != nu_0.size:
+        if nu_0.size != 1:
+            raise ValueError('Input nu_0 must contain one or same number of elements as input nu')
+
+    if rms_turbulent_velocity.size != nu_0.size:
+        if rms_turbulent_velocity.size != 1:
+            raise ValueError('Input rms_turbulent_velocity must contain one or same number of elements as input nu')
+
+    dnu = nu_0 / FCNST.c * NP.sqrt(2 * FCNST.k_B * temperature / mass_particle + rms_turbulent_velocity**2)
+    dnu_FWHM = dnu * 2.0 * NP.sqrt(NP.log(2.0))
+    return dnu_FWHM
+
+###############################################################################
+
 def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
                                      rms_turbulent_velocity=0.0):
 

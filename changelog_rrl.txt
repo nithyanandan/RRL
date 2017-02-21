@@ -1,3 +1,11 @@
+From e974045 (master):
+=====================
+
+In rrl/rrlphysics.py,
+
+(*) Add function doppler_broadened_FWHM() along with docstring to
+compute Doppler broadened FWHM of spectral profile of an RRL
+
 From dfa7b3d (master):
 =====================
 
