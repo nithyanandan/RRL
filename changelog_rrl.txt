@@ -1,3 +1,10 @@
+From dfa7b3d (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function optical_depth() along with docstring
+
 From 0c71e30 (master):
 =====================
 

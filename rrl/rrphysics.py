@@ -970,6 +970,8 @@ def line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e,
                     if NP.any(N_u <= 0.0/units.cm**3):
                         raise ValueError('Input N_u must be positive')
 
+                    if not isinstance(N_l, (int,float,NP.ndarray,units.Quantity)):
+                        raise TypeError('Number density must be a scalar or numpy array')
                     if not isinstance(N_l, units.Quantity):
                         N_l = NP.asarray(N_l).reshape(-1) / units.cm**3
                     else:
@@ -1159,3 +1161,53 @@ def line_opacity_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_
     return line_absorption_coefficient(atomic_number, atomic_mass, n, dn, nu, T_e, N_e, N_ion=N_ion, nu_0=nu_0, rms_turbulent_velocity=rms_turbulent_velocity, lte=lte, non_lte_parms=non_lte_parms, screening=screening)
 
 ###############################################################################
+
+def optical_depth(opacity_coeff, length_scale):
+
+    """
+    ---------------------------------------------------------------------------
+    Calculate optical depth given opacity (absorption) coefficient and length
+    scale of medium
+
+    Inputs:
+
+    opacity_coeff   [scalar or numpy array] Opacity coefficient (in units of
+                    m^-1). It can be a scalar or a numpy array
+
+    length_scale    [scalar or numpy array] Length scale (in pc) of the optical
+                    mediu. It can be a scalar or a numpy array of same size as
+                    input opactiy_coeff
+
+    Output:
+
+    Optical depth of the medium. It will be a scalar or a numpy array of same
+    size as opacity_coeff
+    ---------------------------------------------------------------------------
+    """
+    
+    try:
+        opacity_coeff, length_scale
+    except NameError:
+        raise NameError('Inputs opacity_coeff and length_scale must be specified')
+
+    if not isinstance(opacity_coeff, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input opacity_coeff must be a scalar or a numpy array')
+    if not isinstance(opacity_coeff, units.Quantity):
+        opacity_coeff = NP.asarray(opacity_coeff).reshape(-1) / units.m
+    else:
+        opacity_coeff = units.Quantity(NP.asarray(opacity_coeff.value).reshape(-1), opacity_coeff.unit)
+
+    if not isinstance(length_scale, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input length_scale must be a scalar or a numpy array')
+    if not isinstance(length_scale, units.Quantity):
+        length_scale = NP.asarray(length_scale).reshape(-1) / units.pc
+    else:
+        length_scale = units.Quantity(NP.asarray(length_scale.value).reshape(-1), length_scale.unit)
+    if NP.any(length_scale < 0.0 * units.m):
+        raise ValueError('Input length_scale must not be negative')
+
+    tau = opacity_coeff * length_scale
+    return tau.decompose()
+
+###############################################################################
+
