@@ -600,7 +600,8 @@ def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
 ###############################################################################
 
 def saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=None,
-                            atomic_mass=None, screening=False):
+                            atomic_mass=None, departure_coeff=1.0,
+                            screening=False):
 
     """
     ---------------------------------------------------------------------------
@@ -639,6 +640,12 @@ def saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=None,
                     to unity. It can be specified as a scalar or a numpy array 
                     with size equal to that of input n
 
+    departure_coeff [scalar or numpy array] Coefficients signifying departures
+                    of populations from LTE values. It must lie between 0 and
+                    1. Usually, for large n, these departure coefficients tend
+                    towards unity signifying thermalization and LTE. It can be 
+                    a scalar or a numpy array of size equal to that of input n. 
+
     screening       [boolean] If set to False (default), assume the effective
                     charge is equal to the number of protons. If set to True,
                     assume the charges from the nucleus are screened and the
@@ -674,6 +681,15 @@ def saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=None,
     if NP.any(N_e <= 0.0/units.cm**3):
         raise ValueError('Input N_e must be positive')
 
+    if not isinstance(departure_coeff, (int,float,NP.ndarray)):
+        raise TypeError('Input departure_coeff must be a scalar or a numpy array')
+    departure_coeff = NP.asarray(departure_coeff).reshape(-1)
+    if NP.any(NP.logical_or(departure_coeff < 0.0, departure_coeff > 1.0)):
+        raise ValueError('Input departure_coeff must lie in the range [0,1]')
+    if departure_coeff.size != n.size:
+        if departure_coeff.size != 1:
+            raise ValueError('Departure coeff must be a scalar or a numpy array with same size as input n')
+    
     if N_ion is None:
         N_ion = N_e
     if not isinstance(N_ion, (int,float,NP.ndarray,units.Quantity)):
@@ -688,14 +704,15 @@ def saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=None,
     nu_n = RRL.restframe_freq_recomb(atomic_number, atomic_mass, n, dn=NP.asarray(NP.inf).reshape(-1), screening=screening)
     chi_n = FCNST.h * nu_n / (FCNST.k_B * T_e)
     g_n = statistical_weight(atomic_number, n)
-    N_n = N_e * N_ion * (FCNST.h**2 / (2.0*NP.pi*FCNST.m_e*FCNST.k_B*T_e))**1.5 * (0.5*g_n) * NP.exp(chi_n)
+    N_n = departure_coeff * N_e * N_ion * (FCNST.h**2 / (2.0*NP.pi*FCNST.m_e*FCNST.k_B*T_e))**1.5 * (0.5*g_n) * NP.exp(chi_n)
 
     return N_n.to('cm^-3')
 
 ###############################################################################
 
 def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
-                                     atomic_mass=None, screening=False):
+                                     atomic_mass=None, departure_coeff=1.0,
+                                     screening=False):
 
     """
     ---------------------------------------------------------------------------
@@ -734,6 +751,12 @@ def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
                     to unity. It can be specified as a scalar or a numpy array 
                     with size equal to that of input n
 
+    departure_coeff [scalar or numpy array] Coefficients signifying departures
+                    of populations from LTE values. It must lie between 0 and
+                    1. Usually, for large n, these departure coefficients tend
+                    towards unity signifying thermalization and LTE. It can be 
+                    a scalar or a numpy array of size equal to that of input n. 
+
     screening       [boolean] If set to False (default), assume the effective
                     charge is equal to the number of protons. If set to True,
                     assume the charges from the nucleus are screened and the
@@ -746,7 +769,7 @@ def number_density_with_energy_level(atomic_number, n, T_e, N_e, N_ion=None,
     ---------------------------------------------------------------------------
     """
 
-    return saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, screening=screening)
+    return saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=N_ion, atomic_mass=atomic_mass, departure_coeff=departure_coeff, screening=screening)
 
 ###############################################################################
 

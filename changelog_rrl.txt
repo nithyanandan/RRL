@@ -1,3 +1,12 @@
+From 11af818 (master):
+=====================
+
+In rrl/rrlphysics.py,
+
+(*) Add input departure_coeff to handle departures from LTE in
+functions number_density_with_energy_level() and
+saha_boltzmann_equation(). Update docstrings accordingly
+
 From dbe576c (master):
 =====================
 
