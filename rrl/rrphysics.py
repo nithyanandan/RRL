@@ -769,6 +769,87 @@ def pressure_broadened_FWHM(N_e, temperature, n, nu_0=None, reference='bs71'):
 
 ###############################################################################
 
+def lorentzian_line_profile(nu_0, dnu_FWHM, nu=None):
+
+    """
+    ---------------------------------------------------------------------------
+    Estimate Lorentzian line profile at given frequncies given the center 
+    frequency and frequency FWHM
+    # Reference: Shaver (1975)
+
+    Inputs:
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity 
+
+    dnu_FWHM        [scalar or numpy array] Frequency FWHM (in Hz). Could also 
+                    be specified as an instance of class astropy.units.Quantity
+                    If specified as an array, it must be of same size as nu_0
+
+    nu              [scalar or numpy array] Frequency (Hz) at which line 
+                    profile is to be estimated. If specified as numpy array, 
+                    it must be of same size as input nu_0. Could also be 
+                    specified as an instance of class astropy.units.Quantity
+
+    Output:
+
+    Normalized Lorentzian line profile. Same size as input nu_0. It will
+    be returned as an instance of class astropy.units.Quantity. It will have 
+    units of 'second'
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        nu_0, dnu_FWHM
+    except NameError:
+        raise NameError('Input nu_0 and dnu_FWHM must be specified')
+
+    if not isinstance(dnu_FWHM, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input dnu_FWHM must be a scalar or a numpy array')
+    if not isinstance(dnu_FWHM, units.Quantity):
+        dnu_FWHM = NP.asarray(dnu_FWHM).reshape(-1) * units.Hertz
+    else:
+        dnu_FWHM = units.Quantity(NP.asarray(dnu_FWHM.value).reshape(-1), dnu_FWHM.unit)
+    if NP.any(dnu_FWHM <= 0.0*units.Hertz):
+        raise ValueError('Input dnu_FWHM must be positive')
+
+    if not isinstance(nu_0, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input nu_0 must be a scalar or a numpy array')
+    if not isinstance(nu_0, units.Quantity):
+        nu_0 = NP.asarray(nu_0).reshape(-1) * units.Hertz
+    else:
+        nu_0 = units.Quantity(NP.asarray(nu_0.value).reshape(-1), nu_0.unit)
+    if NP.any(nu_0 <= 0.0*units.Hertz):
+        raise ValueError('Input nu_0 must be positive')
+    
+    if dnu_FWHM.size != nu_0.size:
+        if (dnu_FWHM.size != 1) and (nu_0.size != 1):
+            raise ValueError('Input dnu_FWHM must contain one or same number of elements as input nu_0')
+
+    if nu is None:
+        nu = nu_0
+    else:
+        if not isinstance(nu, (int,float,NP.ndarray,units.Quantity)):
+            raise TypeError('Input nu must be a scalar or a numpy array')
+        if not isinstance(nu, units.Quantity):
+            nu = NP.asarray(nu).reshape(-1) * units.Hertz
+        else:
+            nu = units.Quantity(NP.asarray(nu.value).reshape(-1), nu.unit)
+        if NP.any(nu <= 0.0*units.Hertz):
+            raise ValueError('Input nu must be positive')
+
+        if nu.size != nu_0.size:
+            if (nu.size != 1) and (nu_0.size != 1):
+                raise ValueError('Input nu must contain one or same number of elements as input nu_0')
+
+    gamma = 0.5 * dnu_FWHM
+    line_profile = (gamma / NP.pi) / ((nu-nu_0)**2 + gamma**2)
+
+    return line_profile.decompose()
+
+###############################################################################
+
 def saha_boltzmann_equation(atomic_number, n, T_e, N_e, N_ion=None,
                             atomic_mass=None, departure_coeff=1.0,
                             screening=False):

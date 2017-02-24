@@ -1,3 +1,11 @@
+From 4e89a7a (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function lorentzian_line_profile() along with docstring to
+compute a Lorentzian line profile given FWHM and center frequencies
+
 From 5b6c682 (master):
 =====================
 
