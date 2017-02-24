@@ -859,7 +859,7 @@ def voight_line_profile(nu_0, gaussian_dnu_FWHM, lorentzian_dnu_FWHM, nu=None):
 
     """
     ---------------------------------------------------------------------------
-    Estimate Lorentzian line profile at given frequncies given the center 
+    Estimate Voight line profile at given frequncies given the center 
     frequency and frequency FWHM
     # Reference: Shaver (1975)
 
@@ -959,6 +959,67 @@ def voight_line_profile(nu_0, gaussian_dnu_FWHM, lorentzian_dnu_FWHM, nu=None):
     line_profile = SPS.wofz(z.decompose().value).real / (sigma * NP.sqrt(2.0 * NP.pi))
 
     return line_profile.decompose()
+
+###############################################################################
+
+def voight_FWHM(gaussian_FWHM, lorentzian_FWHM):
+
+    """
+    ---------------------------------------------------------------------------
+    Estimate FWHM of Voight line profile given the FWHM of the Gaussian and
+    Lorentzian profiles
+    # Reference: Olivero, J. J. & R. L. Longbothum (February 1977)
+    # Reference: Wikipedia on Voight profile
+
+    Inputs:
+
+    gaussian_FWHM   [scalar or numpy array] FWHM of the Gaussian profile. 
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity If specified as an array, it must 
+                    be of same size as lorentzian_FWHM
+
+    lorentzian_FWHM [scalar or numpy array] FWHM of the Lorentzian profile.
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity If specified as an array, it must 
+                    be of same size as gaussian_FWHM
+
+    Output:
+
+    FWHM of Voight line profile. Same size as inputs gaussian_FWHM and 
+    lorentzian_FWHM. It will be returned as an instance of 
+    class astropy.units.Quantity. It will have same units as the input FWHM
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        gaussian_FWHM, lorentzian_FWHM
+    except NameError:
+        raise NameError('Input gaussian_FWHM and lorentzian_FWHM must be specified')
+
+    if not isinstance(gaussian_FWHM, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input gaussian_FWHM must be a scalar or a numpy array')
+    if not isinstance(gaussian_FWHM, units.Quantity):
+        gaussian_FWHM = units.Quantity(NP.asarray(gaussian_FWHM.value).reshape(-1))
+    else:
+        gaussian_FWHM = units.Quantity(NP.asarray(gaussian_FWHM.value).reshape(-1), gaussian_FWHM.unit)
+    if NP.any(gaussian_FWHM.value <= 0.0):
+        raise ValueError('Input gaussian_FWHM must be positive')
+
+    if not isinstance(lorentzian_FWHM, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input lorentzian_FWHM must be a scalar or a numpy array')
+    if not isinstance(lorentzian_FWHM, units.Quantity):
+        lorentzian_FWHM = units.Quantity(NP.asarray(lorentzian_FWHM.value).reshape(-1))
+    else:
+        lorentzian_FWHM = units.Quantity(NP.asarray(lorentzian_FWHM.value).reshape(-1), lorentzian_FWHM.unit)
+    if NP.any(lorentzian_FWHM.value <= 0.0):
+        raise ValueError('Input lorentzian_FWHM must be positive')
+
+    if gaussian_FWHM.size != lorentzian_FWHM.size:
+        if (gaussian_FWHM.size != 1) and (lorentzian_FWHM.size != 1):
+            raise ValueError('Input gaussian_FWHM must contain one or same number of elements as input lorentzian_FWHM')
+
+    voight_FWHM = 0.5346 * lorentzian_FWHM + NP.sqrt(0.2166*lorentzian_FWHM**2 + gaussian_FWHM**2)
+    return voight_FWHM.decompose()
 
 ###############################################################################
 

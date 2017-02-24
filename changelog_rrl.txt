@@ -1,3 +1,11 @@
+From 1d6a0c1 (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function voight_FWHM() along with docstring to compute FWHM
+from a Voight profile given FWHM of gaussian and lorentzian profiles.
+
 From a452973 (master):
 =====================
 
