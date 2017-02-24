@@ -585,7 +585,7 @@ def gaussian_line_profile(nu_0, dnu_FWHM, nu=None):
     """
     ---------------------------------------------------------------------------
     Estimate Gaussian line profile at given frequncies given the center 
-    frequency and frequency FWHM
+    frequency and frequency FWHM. It is applicable to Doppler broadening.
     # Reference: Shaver (1975), Rybicki & Lightman (Section 10.6)
 
     Inputs:
@@ -663,92 +663,12 @@ def gaussian_line_profile(nu_0, dnu_FWHM, nu=None):
 
 ###############################################################################
 
-def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
-                                     rms_turbulent_velocity=0.0):
-
-    """
-    ---------------------------------------------------------------------------
-    Estimate Doppler broadened recombination line profiles
-    # Reference: Rybicki & Lightman (Section 10.6)
-
-    Inputs:
-
-    mass_particle   [scalar or numpy array] Mass of particle (kg). If specified
-                    as numpy array, it must be of same size as input nu. 
-                    Could also be specified as an instance of class 
-                    astropy.units.Quantity 
-
-    temperature     [scalar or numpy array] Temperature (K). If specified
-                    as numpy array, it must be of same size as input nu.
-                    Could also be specified as an instance of class 
-                    astropy.units.Quantity 
-
-    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
-                    Should be of same size as input nu. Could also be 
-                    specified as an instance of class astropy.units.Quantity 
-
-    nu              [scalar or numpy array] Frequency (Hz) at which line 
-                    profile is to be estimated. If specified as numpy array, 
-                    it must be of same size as input nu. Could also be 
-                    specified as an instance of class astropy.units.Quantity
-
-    rms_turbulent_velocity
-                    [scalar or numpy array] RMS of turbulent velocity (in 
-                    km/s). If specified as numpy array, it must be of same 
-                    size as input nu. Could also be specified as an instance 
-                    of class astropy.units.Quantity Quantity
-
-    Output:
-
-    Normalized Doppler-broadened line profile. Same size as input nu_0. It will
-    be returned as an instance of class astropy.units.Quantity. It will have 
-    units of 'second'
-    ---------------------------------------------------------------------------
-    """
-
-    try:
-        nu
-    except NameError:
-        raise NameError('Input nu must be specified')
-
-    dnu_FWHM = doppler_broadened_FWHM(mass_particle, temperature, nu_0, rms_turbulent_velocity=rms_turbulent_velocity)
-
-    if not isinstance(nu, (int,float,NP.ndarray,units.Quantity)):
-        raise TypeError('Input nu must be a scalar or a numpy array')
-    if not isinstance(nu, units.Quantity):
-        nu = NP.asarray(nu).reshape(-1) * units.Hertz
-    else:
-        nu = units.Quantity(NP.asarray(nu.value).reshape(-1), nu.unit)
-    if NP.any(nu <= 0.0*units.Hertz):
-        raise ValueError('Input nu must be positive')
-
-    if not isinstance(nu_0, (int,float,NP.ndarray,units.Quantity)):
-        raise TypeError('Input nu_0 must be a scalar or a numpy array')
-    if not isinstance(nu_0, units.Quantity):
-        nu_0 = NP.asarray(nu_0).reshape(-1) * units.Hertz
-    else:
-        nu_0 = units.Quantity(NP.asarray(nu_0.value).reshape(-1), nu_0.unit)
-    if NP.any(nu_0 <= 0.0*units.Hertz):
-        raise ValueError('Input nu_0 must be positive')
-    
-    if nu_0.size != nu.size:
-        if nu_0.size != 1:
-            raise ValueError('Input nu_0 must contain one or same number of elements as input nu')
-
-    dnu = dnu_FWHM / (2.0 * NP.sqrt(NP.log(2.0)))
-    # dnu = nu_0 / FCNST.c * NP.sqrt(2 * FCNST.k_B * temperature / mass_particle + rms_turbulent_velocity**2) 
-
-    line_profile = 1.0 / (NP.sqrt(NP.pi) * dnu) * NP.exp(-(nu-nu_0)**2 / dnu**2)
-
-    return line_profile.decompose()
-
-###############################################################################
-
 def pressure_broadened_FWHM(N_e, temperature, n, nu_0=None, reference='bs71'):
 
     """
     ---------------------------------------------------------------------------
     Estimate pressure (collision) broadened FWHM of recombination line profiles
+    It is applicable to intrinsic and/or pressure (collisonal) broadening.
     # Reference: Shaver (1975), Griem (1967), Brocklehurst and Seaton (1971)
 
     Inputs:

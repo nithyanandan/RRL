@@ -1,3 +1,14 @@
+From 7f12e07 (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Remove function doppler_broadened_rrline_profile() as it can
+now be replaced with a combination of doppler_broadedned_FWHM() and
+gaussian_line_profile()
+(*) Minor updates in docstrings of gaussian_line_profile() and
+lorentzian_line_profile()
+
 From 445e6dc (master):
 =====================
 
