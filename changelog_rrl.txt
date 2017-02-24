@@ -1,3 +1,12 @@
+From a452973 (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function voight_line_profile() along with docstring to
+compute the Voight line profile that is the result of a convolution
+between gaussian and lorentzian line profiles
+
 From 7f12e07 (master):
 =====================
 
