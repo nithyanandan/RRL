@@ -1,4 +1,5 @@
 import numpy as NP
+import warnings
 from astropy import constants as FCNST
 from astropy import units
 import scipy.special as SPS
@@ -563,19 +564,15 @@ def doppler_broadened_FWHM(mass_particle, temperature, nu_0,
     
     if mass_particle.size != nu_0.size:
         if mass_particle.size != 1:
-            raise ValueError('Input mass_particle must contain one or same number of elements as input nu')
+            raise ValueError('Input mass_particle must contain one or same number of elements as input nu_0')
 
     if temperature.size != nu_0.size:
         if temperature.size != 1:
-            raise ValueError('Input temperature must contain one or same number of elements as input nu')
-
-    if nu_0.size != nu_0.size:
-        if nu_0.size != 1:
-            raise ValueError('Input nu_0 must contain one or same number of elements as input nu')
+            raise ValueError('Input temperature must contain one or same number of elements as input nu_0')
 
     if rms_turbulent_velocity.size != nu_0.size:
         if rms_turbulent_velocity.size != 1:
-            raise ValueError('Input rms_turbulent_velocity must contain one or same number of elements as input nu')
+            raise ValueError('Input rms_turbulent_velocity must contain one or same number of elements as input nu_0')
 
     dnu = nu_0 / FCNST.c * NP.sqrt(2 * FCNST.k_B * temperature / mass_particle + rms_turbulent_velocity**2)
     dnu_FWHM = dnu * 2.0 * NP.sqrt(NP.log(2.0))
@@ -627,27 +624,11 @@ def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
     """
 
     try:
-        mass_particle, temperature, nu_0, nu
+        nu
     except NameError:
-        raise NameError('Inputs mass_particle, temperature, nu_0 and nu must be specified')
+        raise NameError('Input nu must be specified')
 
-    if not isinstance(mass_particle, (int,float,NP.ndarray,units.Quantity)):
-        raise TypeError('Input mass_particle must be a scalar or a numpy array')
-    if not isinstance(mass_particle, units.Quantity):
-        mass_particle = NP.asarray(mass_particle).reshape(-1) * units.kilogram
-    else:
-        mass_particle = units.Quantity(NP.asarray(mass_particle.value).reshape(-1), mass_particle.unit)
-    if NP.any(mass_particle <= 0.0*units.kilogram):
-        raise ValueError('Input mass_particle must be positive')
-
-    if not isinstance(temperature, (int,float,NP.ndarray,units.Quantity)):
-        raise TypeError('Input temperature must be a scalar or a numpy array')
-    if not isinstance(temperature, units.Quantity):
-        temperature = NP.asarray(temperature).reshape(-1) * units.Kelvin
-    else:
-        temperature = units.Quantity(NP.asarray(temperature.value).reshape(-1), temperature.unit)
-    if NP.any(temperature <= 0.0*units.Kelvin):
-        raise ValueError('Input temperature must be positive')
+    dnu_FWHM = doppler_broadened_FWHM(mass_particle, temperature, nu_0, rms_turbulent_velocity=rms_turbulent_velocity)
 
     if not isinstance(nu, (int,float,NP.ndarray,units.Quantity)):
         raise TypeError('Input nu must be a scalar or a numpy array')
@@ -667,36 +648,124 @@ def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
     if NP.any(nu_0 <= 0.0*units.Hertz):
         raise ValueError('Input nu_0 must be positive')
     
-    if not isinstance(rms_turbulent_velocity, (int,float,NP.ndarray,units.Quantity)):
-        raise TypeError('Input rms_turbulent_velocity must be a scalar or a numpy array')
-    if not isinstance(rms_turbulent_velocity, units.Quantity):
-        rms_turbulent_velocity = NP.asarray(rms_turbulent_velocity).reshape(-1) * units.kilometer / units.second
-    else:
-        rms_turbulent_velocity = units.Quantity(NP.asarray(rms_turbulent_velocity.value).reshape(-1), rms_turbulent_velocity.unit)
-    if NP.any(rms_turbulent_velocity < 0.0 * units.kilometer / units.second):
-        raise ValueError('Input rms_turbulent_velocity must not be negative')
-    
-    if mass_particle.size != nu.size:
-        if mass_particle.size != 1:
-            raise ValueError('Input mass_particle must contain one or same number of elements as input nu')
-
-    if temperature.size != nu.size:
-        if temperature.size != 1:
-            raise ValueError('Input temperature must contain one or same number of elements as input nu')
-
     if nu_0.size != nu.size:
         if nu_0.size != 1:
             raise ValueError('Input nu_0 must contain one or same number of elements as input nu')
 
-    if rms_turbulent_velocity.size != nu.size:
-        if rms_turbulent_velocity.size != 1:
-            raise ValueError('Input rms_turbulent_velocity must contain one or same number of elements as input nu')
-
-    dnu = nu_0 / FCNST.c * NP.sqrt(2 * FCNST.k_B * temperature / mass_particle + rms_turbulent_velocity**2) 
+    dnu = dnu_FWHM / (2.0 * NP.sqrt(NP.log(2.0)))
+    # dnu = nu_0 / FCNST.c * NP.sqrt(2 * FCNST.k_B * temperature / mass_particle + rms_turbulent_velocity**2) 
 
     line_profile = 1.0 / (NP.sqrt(NP.pi) * dnu) * NP.exp(-(nu-nu_0)**2 / dnu**2)
 
-    return line_profile
+    return line_profile.decompose()
+
+###############################################################################
+
+def pressure_broadened_FWHM(N_e, temperature, n, nu_0=None, reference='bs71'):
+
+    """
+    ---------------------------------------------------------------------------
+    Estimate pressure (collision) broadened FWHM of recombination line profiles
+    # Reference: Shaver (1975), Griem (1967), Brocklehurst and Seaton (1971)
+
+    Inputs:
+
+    N_e             [scalar or numpy array] Number density (in cm^-3) of 
+                    electrons. Must be positive. It can be specified as a 
+                    scalar or a numpy array with size equal to that of input n
+
+    temperature     [scalar or numpy array] Temperature (K). If specified
+                    as numpy array, it must be of same size as input nu.
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity 
+
+    n               [scalar or numpy array] Principal quantum number of 
+                    electron orbits. Must be positive integer and greater than 
+                    or equal to unity. Must be a scalar or numpy array
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Should be of same size as input nu. Could also be 
+                    specified as an instance of class astropy.units.Quantity
+
+    reference       [string] Reference papers on which the calculation is 
+                    based. Accepted values are 'br71' (default) for 
+                    Brocklehurst & Seaton (1971) and 'g67' for Griem (1967).
+                    
+
+    Output:
+
+    FWHM of the pressure broadened line profile (in Hz). Same size as input 
+    nu_0. It will be returned as an instance of class astropy.units.Quantity. 
+    It will have units of 'second'
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        N_e, temperature, n
+    except NameError:
+        raise NameError('Inputs N_e, temperature, and n must be specified')
+
+    if not isinstance(n, (int, NP.ndarray)):
+        raise TypeError('Input n must be an integer or numpy array')
+    n = NP.asarray(n).reshape(-1)
+    if NP.any(n < 1):
+        raise ValueError('Lower electron level must be greater than 1')
+    
+    if not isinstance(N_e, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input N_e must be a scalar or a numpy array')
+    if not isinstance(N_e, units.Quantity):
+        N_e = NP.asarray(N_e).reshape(-1) / units.cm**3
+    else:
+        N_e = units.Quantity(NP.asarray(N_e.value).reshape(-1), N_e.unit)
+    if NP.any(N_e <= 0.0/units.cm**3):
+        raise ValueError('Input N_e must be positive')
+
+    if not isinstance(temperature, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input temperature must be a scalar or a numpy array')
+    if not isinstance(temperature, units.Quantity):
+        temperature = NP.asarray(temperature).reshape(-1) * units.Kelvin
+    else:
+        temperature = units.Quantity(NP.asarray(temperature.value).reshape(-1), temperature.unit)
+    if NP.any(temperature <= 0.0*units.Kelvin):
+        raise ValueError('Input temperature must be positive')
+
+    if not isinstance(reference, str):
+        raise TypeError('Input reference must be a string')
+    if reference.lower() not in ['g67', 'bs71']:
+        raise ValueError('Specified reference invalid')
+    if reference.lower() == 'g67':
+        if nu_0 is None:
+            raise TypeError('Input nu_0 must be specified')
+        if not isinstance(nu_0, (int,float,NP.ndarray,units.Quantity)):
+            raise TypeError('Input nu_0 must be a scalar or a numpy array')
+        if not isinstance(nu_0, units.Quantity):
+            nu_0 = NP.asarray(nu_0).reshape(-1) * units.Hertz
+        else:
+            nu_0 = units.Quantity(NP.asarray(nu_0.value).reshape(-1), nu_0.unit)
+        if NP.any(nu_0 <= 0.0*units.Hertz):
+            raise ValueError('Input nu_0 must be positive')
+        if nu_0.size != n.size:
+            if nu_0.size != 1:
+                raise ValueError('Input nu_0 must contain one or same number of elements as input n')
+    
+    if temperature.size != n.size:
+        if temperature.size != 1:
+            raise ValueError('Input temperature must contain one or same number of elements as input n')
+
+    if N_e.size != n.size:
+        if N_e.size != 1:
+            raise ValueError('Input N_e must contain one or same number of elements as input n')
+
+    if reference == 'g67':
+        warnings.warn('Pressure broadening results based on Griem (1967) only valid for Hydrogen, low temperatures and large n')
+        dnu_FWHM = (5.0/3.0/NP.sqrt(2.0*NP.pi)) * (FCNST.hbar/FCNST.m_e)**2 * NP.sqrt(FCNST.m_e/FCNST.k_B/temperature) * N_e * n**4 * (0.5 + NP.log(FCNST.k_B*temperature/(3.0*FCNST.hbar*nu_0*n**2)))
+        if NP.any(dnu_FWHM <= 0.0 * units.Hertz):
+            raise ValueError('Some values of dnu_FWHM found to be not positive. Check validity of inputs and conditions under which equations are valid.')
+    else:
+        warnings.warn('Pressure broadening results based on Broclehurst & Seaton (1971) only valid for Hydrogen, low temperatures, large n and n >> dn')
+        dnu_FWHM = 3.74e-8*units.Hertz * (N_e / (1.0 * units.cm**-3)) / (temperature / (1.0*units.Kelvin))**0.1 * (1.0*n)**4.4 
+
+    return dnu_FWHM
 
 ###############################################################################
 

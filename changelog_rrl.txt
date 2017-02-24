@@ -1,3 +1,13 @@
+From 5b6c682 (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function pressure_broadened_FWHM() along with docstring to
+compute pressure (collision) broadened FWHM.
+(*) Fix bugs in functions doppler_broadened_FWHM() and
+doppler_broadened_rrline_profile() 
+
 From e974045 (master):
 =====================
 
