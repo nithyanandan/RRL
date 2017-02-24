@@ -580,6 +580,89 @@ def doppler_broadened_FWHM(mass_particle, temperature, nu_0,
 
 ###############################################################################
 
+def gaussian_line_profile(nu_0, dnu_FWHM, nu=None):
+
+    """
+    ---------------------------------------------------------------------------
+    Estimate Gaussian line profile at given frequncies given the center 
+    frequency and frequency FWHM
+    # Reference: Shaver (1975), Rybicki & Lightman (Section 10.6)
+
+    Inputs:
+
+    nu_0            [scalar or numpy array] Line-center frequency (in Hz). 
+                    Could also be specified as an instance of class 
+                    astropy.units.Quantity 
+
+    dnu_FWHM        [scalar or numpy array] Frequency FWHM (in Hz). Could also 
+                    be specified as an instance of class astropy.units.Quantity
+                    If specified as an array, it must be of same size as nu_0
+
+    nu              [scalar or numpy array] Frequency (Hz) at which line 
+                    profile is to be estimated. If specified as numpy array, 
+                    it must be of same size as input nu_0. Could also be 
+                    specified as an instance of class astropy.units.Quantity.
+                    If not specified, line profiles at the line centers (nu_0)
+                    will be calculated.
+
+    Output:
+
+    Normalized Gaussian line profile. Same size as input nu_0. It will
+    be returned as an instance of class astropy.units.Quantity. It will have 
+    units of 'second'
+    ---------------------------------------------------------------------------
+    """
+
+    try:
+        nu_0, dnu_FWHM
+    except NameError:
+        raise NameError('Input nu_0 and dnu_FWHM must be specified')
+
+    if not isinstance(dnu_FWHM, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input dnu_FWHM must be a scalar or a numpy array')
+    if not isinstance(dnu_FWHM, units.Quantity):
+        dnu_FWHM = NP.asarray(dnu_FWHM).reshape(-1) * units.Hertz
+    else:
+        dnu_FWHM = units.Quantity(NP.asarray(dnu_FWHM.value).reshape(-1), dnu_FWHM.unit)
+    if NP.any(dnu_FWHM <= 0.0*units.Hertz):
+        raise ValueError('Input dnu_FWHM must be positive')
+
+    if not isinstance(nu_0, (int,float,NP.ndarray,units.Quantity)):
+        raise TypeError('Input nu_0 must be a scalar or a numpy array')
+    if not isinstance(nu_0, units.Quantity):
+        nu_0 = NP.asarray(nu_0).reshape(-1) * units.Hertz
+    else:
+        nu_0 = units.Quantity(NP.asarray(nu_0.value).reshape(-1), nu_0.unit)
+    if NP.any(nu_0 <= 0.0*units.Hertz):
+        raise ValueError('Input nu_0 must be positive')
+    
+    if dnu_FWHM.size != nu_0.size:
+        if (dnu_FWHM.size != 1) and (nu_0.size != 1):
+            raise ValueError('Input dnu_FWHM must contain one or same number of elements as input nu_0')
+
+    if nu is None:
+        nu = nu_0
+    else:
+        if not isinstance(nu, (int,float,NP.ndarray,units.Quantity)):
+            raise TypeError('Input nu must be a scalar or a numpy array')
+        if not isinstance(nu, units.Quantity):
+            nu = NP.asarray(nu).reshape(-1) * units.Hertz
+        else:
+            nu = units.Quantity(NP.asarray(nu.value).reshape(-1), nu.unit)
+        if NP.any(nu <= 0.0*units.Hertz):
+            raise ValueError('Input nu must be positive')
+
+        if nu.size != nu_0.size:
+            if (nu.size != 1) and (nu_0.size != 1):
+                raise ValueError('Input nu must contain one or same number of elements as input nu_0')
+
+    dnu = dnu_FWHM / (2.0 * NP.sqrt(NP.log(2.0)))
+    line_profile = 1.0 / (NP.sqrt(NP.pi) * dnu) * NP.exp(-(nu-nu_0)**2 / dnu**2)
+
+    return line_profile.decompose()
+
+###############################################################################
+
 def doppler_broadened_rrline_profile(mass_particle, temperature, nu_0, nu,
                                      rms_turbulent_velocity=0.0):
 
@@ -791,6 +874,8 @@ def lorentzian_line_profile(nu_0, dnu_FWHM, nu=None):
                     profile is to be estimated. If specified as numpy array, 
                     it must be of same size as input nu_0. Could also be 
                     specified as an instance of class astropy.units.Quantity
+                    If not specified, line profiles at the line centers (nu_0)
+                    will be calculated.
 
     Output:
 

@@ -1,10 +1,20 @@
+From 445e6dc (master):
+=====================
+
+In rrl/rrphysics.py,
+
+(*) Add function lorentzian_line_profile() along with docstring to
+compute a Lorentzian line profile given FWHM and center frequencies.
+It is applicable to Doppler broadening
+
 From 4e89a7a (master):
 =====================
 
 In rrl/rrphysics.py,
 
 (*) Add function lorentzian_line_profile() along with docstring to
-compute a Lorentzian line profile given FWHM and center frequencies
+compute a Lorentzian line profile given FWHM and center frequencies.
+It is applicable to pressure (collisional) broadening
 
 From 5b6c682 (master):
 =====================
